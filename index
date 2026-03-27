@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Pendulum - Chaos Visualizer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f8f8f6;
+    color: #1a1a1a;
+    padding: 1.5rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1c1c1a; color: #e8e8e6; }
+    .card { background: #2a2a28; border-color: rgba(255,255,255,0.12); }
+    button { background: transparent; color: #e8e8e6; border-color: rgba(255,255,255,0.25); }
+    button:hover { background: rgba(255,255,255,0.08); }
+    input[type="range"]::-webkit-slider-runnable-track { background: rgba(255,255,255,0.15); }
+    input[type="range"]::-moz-range-track { background: rgba(255,255,255,0.15); }
+    .label { color: #a0a09a; }
+    .hint { color: #706f6a; }
+    .legend-dot-a { background: #7F77DD; }
+    .legend-dot-b { background: #F0997B; }
+  }
+  h1 { font-size: 22px; font-weight: 500; margin-bottom: 1.5rem; }
+  .card {
+    background: #fff;
+    border: 0.5px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .controls { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .control-group { flex: 1; min-width: 140px; }
+  .label { font-size: 13px; color: #6b6b66; display: block; margin-bottom: 4px; }
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  .slider-val {
+    font-size: 13px; font-weight: 500; min-width: 40px;
+    text-align: right; font-family: ui-monospace, monospace;
+  }
+  input[type="range"] {
+    flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+    background: transparent; outline: none;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; background: rgba(0,0,0,0.12);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: #534AB7; border: 2px solid #fff; margin-top: -7px; cursor: pointer;
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.15);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 4px; border-radius: 2px; background: rgba(0,0,0,0.12); border: none;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #534AB7; border: 2px solid #fff; cursor: pointer;
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.15);
+  }
+  .btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  button {
+    background: transparent; border: 0.5px solid rgba(0,0,0,0.25);
+    border-radius: 8px; padding: 6px 14px; font-size: 13px;
+    cursor: pointer; color: #1a1a1a; transition: background 0.15s;
+  }
+  button:hover { background: rgba(0,0,0,0.04); }
+  button:active { transform: scale(0.98); }
+  canvas {
+    width: 100%; border-radius: 12px;
+    border: 0.5px solid rgba(0,0,0,0.12); display: block;
+  }
+  .legend {
+    display: flex; gap: 16px; margin-top: 12px; font-size: 13px;
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+  }
+  .legend-dot-a { background: #534AB7; }
+  .legend-dot-b { background: #D85A30; }
+  .hint { font-size: 12px; color: #a0a09a; }
+</style>
+</head>
+<body>
+
+<h1>Double pendulum — chaos visualizer</h1>
+
+<div class="card">
+  <div class="controls">
+    <div class="control-group">
+      <label class="label">Angle 1 (deg)</label>
+      <div class="slider-row">
+        <input type="range" min="10" max="179" value="120" step="1" id="a1" />
+        <span class="slider-val" id="a1v">120</span>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="label">Angle 2 (deg)</label>
+      <div class="slider-row">
+        <input type="range" min="10" max="179" value="120" step="1" id="a2" />
+        <span class="slider-val" id="a2v">120</span>
+      </div>
+    </div>
+    <div class="control-group">
+      <label class="label">Perturbation (deg)</label>
+      <div class="slider-row">
+        <input type="range" min="0.01" max="5" value="0.5" step="0.01" id="eps" />
+        <span class="slider-val" id="epsv">0.50</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="startBtn" onclick="startSim()">Start</button>
+    <button id="resetBtn" onclick="resetSim()">Reset</button>
+  </div>
+
+  <canvas id="cv"></canvas>
+
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-dot legend-dot-a"></span>
+      <span>Pendulum A</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot legend-dot-b"></span>
+      <span>Pendulum B (perturbed)</span>
+    </div>
+  </div>
+</div>
+
+<p class="hint" style="margin-top: 4px;">
+  Two identical double pendulums differ only by the tiny perturbation angle.
+  Watch them diverge — that's sensitive dependence on initial conditions.
+</p>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+// Physics constants
+const L1 = 1, L2 = 1, m1 = 1, m2 = 1, g = 9.81;
+const dt = 0.002, stepsPerFrame = 8;
+const maxTrail = 600;
+
+let running = false, animId = null;
+let stateA, stateB, trailA, trailB;
+
+function resize() {
+  const w = cv.clientWidth;
+  const h = Math.min(w * 0.75, 500);
+  cv.width = w * devicePixelRatio;
+  cv.height = h * devicePixelRatio;
+  cv.style.height = h + 'px';
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+resize();
+window.addEventListener('resize', () => {
+  resize();
+  if (!running) drawFrame();
+});
+
+// Equations of motion for double pendulum
+function derivs(s) {
+  const [t1, w1, t2, w2] = s;
+  const d = t1 - t2;
+  const den = 2 * m1 + m2 - m2 * Math.cos(2 * d);
+
+  const a1 = (
+    -g * (2 * m1 + m2) * Math.sin(t1)
+    - m2 * g * Math.sin(t1 - 2 * t2)
+    - 2 * Math.sin(d) * m2 * (w2 * w2 * L2 + w1 * w1 * L1 * Math.cos(d))
+  ) / (L1 * den);
+
+  const a2 = (
+    2 * Math.sin(d) * (
+      w1 * w1 * L1 * (m1 + m2)
+      + g * (m1 + m2) * Math.cos(t1)
+      + w2 * w2 * L2 * m2 * Math.cos(d)
+    )
+  ) / (L2 * den);
+
+  return [w1, a1, w2, a2];
+}
+
+// 4th-order Runge-Kutta integrator
+function rk4(s) {
+  const k1 = derivs(s);
+  const s2 = s.map((v, i) => v + k1[i] * dt / 2);
+  const k2 = derivs(s2);
+  const s3 = s.map((v, i) => v + k2[i] * dt / 2);
+  const k3 = derivs(s3);
+  const s4 = s.map((v, i) => v + k3[i] * dt);
+  const k4 = derivs(s4);
+  return s.map((v, i) => v + (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) * dt / 6);
+}
+
+// Position of the second bob (tip)
+function tip(s) {
+  const x = L1 * Math.sin(s[0]) + L2 * Math.sin(s[2]);
+  const y = L1 * Math.cos(s[0]) + L2 * Math.cos(s[2]);
+  return [x, y];
+}
+
+function initStates() {
+  const t1 = parseFloat(document.getElementById('a1').value) * Math.PI / 180;
+  const t2 = parseFloat(document.getElementById('a2').value) * Math.PI / 180;
+  const eps = parseFloat(document.getElementById('eps').value) * Math.PI / 180;
+  stateA = [t1, 0, t2, 0];
+  stateB = [t1 + eps, 0, t2, 0];
+  trailA = [];
+  trailB = [];
+}
+
+function drawFrame() {
+  const w = cv.width / devicePixelRatio;
+  const h = cv.height / devicePixelRatio;
+  const ox = w / 2;
+  const oy = h * 0.3;
+  const scale = Math.min(w, h) / 5.5;
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  ctx.clearRect(0, 0, w, h);
+
+  function worldToScreen(x, y) {
+    return [ox + x * scale, oy + y * scale];
+  }
+
+  // Draw trail with fading opacity
+  function drawTrail(trail, color) {
+    if (trail.length < 2) return;
+    for (let i = 1; i < trail.length; i++) {
+      const alpha = (i / trail.length) * 0.7;
+      ctx.beginPath();
+      ctx.strokeStyle = color.replace('A)', alpha + ')');
+      ctx.lineWidth = 1.5;
+      const [x0, y0] = worldToScreen(trail[i - 1][0], trail[i - 1][1]);
+      const [x1, y1] = worldToScreen(trail[i][0], trail[i][1]);
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+  }
+
+  drawTrail(trailA, 'rgba(83,74,183,A)');
+  drawTrail(trailB, 'rgba(216,90,48,A)');
+
+  // Draw a single pendulum
+  function drawPend(s, armColor, bobColor) {
+    const x1 = L1 * Math.sin(s[0]);
+    const y1 = L1 * Math.cos(s[0]);
+    const x2 = x1 + L2 * Math.sin(s[2]);
+    const y2 = y1 + L2 * Math.cos(s[2]);
+    const [sx0, sy0] = worldToScreen(0, 0);
+    const [sx1, sy1] = worldToScreen(x1, y1);
+    const [sx2, sy2] = worldToScreen(x2, y2);
+
+    // Arms
+    ctx.beginPath();
+    ctx.strokeStyle = isDark ? 'rgba(167,139,250,0.85)' : 'rgba(127,59,210,0.85)';
+    ctx.lineWidth = 2;
+    ctx.moveTo(sx0, sy0);
+    ctx.lineTo(sx1, sy1);
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx2, sy2);
+    ctx.stroke();
+
+    // Joint
+    ctx.beginPath();
+    ctx.arc(sx1, sy1, 5, 0, Math.PI * 2);
+    ctx.fillStyle = armColor;
+    ctx.fill();
+
+    // Bob
+    ctx.beginPath();
+    ctx.arc(sx2, sy2, 7, 0, Math.PI * 2);
+    ctx.fillStyle = bobColor;
+    ctx.fill();
+  }
+
+  // Pivot point
+  ctx.beginPath();
+  ctx.arc(ox, oy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = isDark ? '#888' : '#666';
+  ctx.fill();
+
+  drawPend(stateA, '#7F77DD', '#534AB7');
+  drawPend(stateB, '#F0997B', '#D85A30');
+}
+
+function animate() {
+  for (let i = 0; i < stepsPerFrame; i++) {
+    stateA = rk4(stateA);
+    stateB = rk4(stateB);
+    const tA = tip(stateA);
+    const tB = tip(stateB);
+    trailA.push(tA);
+    trailB.push(tB);
+    if (trailA.length > maxTrail) trailA.shift();
+    if (trailB.length > maxTrail) trailB.shift();
+  }
+  drawFrame();
+  animId = requestAnimationFrame(animate);
+}
+
+function startSim() {
+  if (running) return;
+  running = true;
+  document.getElementById('startBtn').textContent = 'Running...';
+  animate();
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  document.getElementById('startBtn').textContent = 'Start';
+  initStates();
+  drawFrame();
+}
+
+// Slider event listeners
+document.getElementById('a1').addEventListener('input', function () {
+  document.getElementById('a1v').textContent = this.value;
+  if (!running) { initStates(); drawFrame(); }
+});
+document.getElementById('a2').addEventListener('input', function () {
+  document.getElementById('a2v').textContent = this.value;
+  if (!running) { initStates(); drawFrame(); }
+});
+document.getElementById('eps').addEventListener('input', function () {
+  document.getElementById('epsv').textContent = parseFloat(this.value).toFixed(2);
+  if (!running) { initStates(); drawFrame(); }
+});
+
+// Initialize and draw
+initStates();
+drawFrame();
+</script>
+
+</body>
+</html>
